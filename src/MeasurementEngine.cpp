@@ -165,6 +165,7 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
     const int64_t preRollSamples = (int64_t)(std::max(0.0, config.preRollSeconds) * sampleRate);
     for (int64_t done = 0; done < preRollSamples; done += blockSize) {
         outputBuffer.clear();
+        midiBuffer.clear(); // don't accumulate MIDI the plugin emits during the pre-roll
         plugin.processBlock(outputBuffer, midiBuffer);
     }
 
