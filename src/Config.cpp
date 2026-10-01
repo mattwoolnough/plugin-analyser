@@ -30,6 +30,8 @@ Config Config::fromJsonString(const juce::String& jsonString) {
         config.sampleRate = (double)root->getProperty("sampleRate");
     if (root->hasProperty("seconds"))
         config.seconds = (double)root->getProperty("seconds");
+    if (root->hasProperty("preRollSeconds"))
+        config.preRollSeconds = (double)root->getProperty("preRollSeconds");
     if (root->hasProperty("blockSize"))
         config.blockSize = (int)root->getProperty("blockSize");
 
