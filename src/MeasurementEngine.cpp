@@ -199,7 +199,8 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
         for (int ch = 0; ch < std::min(numPluginIns, inputBuffer.getNumChannels()); ++ch)
             outputBuffer.copyFrom(ch, 0, inputBuffer, ch, 0, numThisBlock);
 
-        // Process through plugin (modifies outputBuffer in-place)
+        // Process through plugin (modifies outputBuffer in-place); don't feed back any MIDI it produced
+        midiBuffer.clear();
         plugin.processBlock(outputBuffer, midiBuffer);
 
         // Delay the input by `latency` samples so it lines up with the output
