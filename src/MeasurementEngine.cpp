@@ -203,6 +203,9 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
 
         // Process through plugin (modifies outputBuffer in-place); don't feed back any MIDI it produced
         midiBuffer.clear();
+        if (numPluginIns == 0 && currentSample == 0) {
+            midiBuffer.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)100), 0);
+        }
         plugin.processBlock(outputBuffer, midiBuffer);
 
         // Delay the input by `latency` samples so it lines up with the output
