@@ -8,25 +8,20 @@
 LinearResponseAnalyzer::LinearResponseAnalyzer(const juce::File& outDir, int fftSize,
                                                const std::vector<juce::String>& paramNames,
                                                const juce::String& signalType)
-    : fftSize(fftSize), paramNames(paramNames), outputDir(outDir), signalType(signalType) {}
-
-LinearResponseAnalyzer::~LinearResponseAnalyzer() {}
-
-void LinearResponseAnalyzer::applyHannWindow(std::vector<float>& buffer) {
-    const int N = (int)buffer.size();
-    for (int i = 0; i < N; ++i) {
-        float window = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * (float)i / (float)(N - 1)));
-        buffer[i] *= window;
+    : fftSize(fftSize), paramNames(paramNames), outputDir(outDir), signalType(signalType) {
+    // Precompute periodic Hann window: dividing by fftSize (not fftSize - 1)
+    // so overlap-and-add sums to exactly flat 1.0 at 50% overlap
+    window.resize(fftSize);
+    for (int i = 0; i < fftSize; ++i) {
+        window[i] = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * (float)i / (float)fftSize));
     }
 }
+
+LinearResponseAnalyzer::~LinearResponseAnalyzer() {}
 
 void LinearResponseAnalyzer::processFFTWindow(RunSpectrum& spectrum) {
     if ((int)spectrum.inBuffer.size() < fftSize || (int)spectrum.outBuffer.size() < fftSize)
         return;
-
-    // Apply window
-    applyHannWindow(spectrum.inBuffer);
-    applyHannWindow(spectrum.outBuffer);
 
     // Perform FFT
     juce::dsp::FFT fft((int)std::log2(fftSize));
@@ -35,10 +30,11 @@ void LinearResponseAnalyzer::processFFTWindow(RunSpectrum& spectrum) {
     std::vector<std::complex<float>> inFFT(fftSize);
     std::vector<std::complex<float>> outFFT(fftSize);
 
-    // Copy to complex buffers
+    // Copy to complex buffers with precomputed periodic Hann window (leaving raw buffers intact for overlap)
     for (int i = 0; i < fftSize; ++i) {
-        inTime[i] = std::complex<float>(spectrum.inBuffer[i], 0.0f);
-        outTime[i] = std::complex<float>(spectrum.outBuffer[i], 0.0f);
+        float w = window[i];
+        inTime[i] = std::complex<float>(spectrum.inBuffer[i] * w, 0.0f);
+        outTime[i] = std::complex<float>(spectrum.outBuffer[i] * w, 0.0f);
     }
 
     // Transform input and output separately (FFT::perform is input -> output, out-of-place)
@@ -61,9 +57,10 @@ void LinearResponseAnalyzer::processFFTWindow(RunSpectrum& spectrum) {
 
     spectrum.numAverages++;
 
-    // Clear buffers for next window
-    spectrum.inBuffer.clear();
-    spectrum.outBuffer.clear();
+    // 50% overlap: advance by fftSize / 2, keeping the second half for the next window
+    const int hopSize = fftSize / 2;
+    spectrum.inBuffer.erase(spectrum.inBuffer.begin(), spectrum.inBuffer.begin() + hopSize);
+    spectrum.outBuffer.erase(spectrum.outBuffer.begin(), spectrum.outBuffer.begin() + hopSize);
 }
 
 void LinearResponseAnalyzer::processBlock(const BlockContext& ctx) {
