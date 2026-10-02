@@ -18,6 +18,14 @@ struct Config {
     double sampleRate = 48000.0;
     double seconds = 5.0;
     double preRollSeconds = 0.1; // silence rendered after reset() and before each run, not measured
+
+    // MIDI note: "auto" sends it to plugins with no audio inputs that accept MIDI (instruments), "on" to any
+    // plugin, "off" never. Held from noteSettleSeconds before the measurement until a note-off after it.
+    juce::String midiMode = "auto";
+    int midiNote = 60;
+    int midiVelocity = 100;
+    int midiChannel = 1;
+    double noteSettleSeconds = 0.0;
     int blockSize = 256;
     juce::String signalType; // "sine", "noise", "sweep"
     double sineFrequency = 1000.0;
@@ -27,7 +35,7 @@ struct Config {
     std::vector<ParameterBucketConfig> parameterBuckets;
     std::vector<juce::String> analyzers;
 
-    // Throws std::runtime_error if sampleRate, seconds or blockSize are unusable
+    // Throws std::runtime_error if the audio or MIDI settings are unusable
     void validate() const;
 
     static Config fromJson(const juce::File& jsonFile);

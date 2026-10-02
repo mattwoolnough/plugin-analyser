@@ -169,6 +169,27 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
         plugin.processBlock(outputBuffer, midiBuffer);
     }
 
+    // MIDI note for instruments ("auto": plugins with no audio inputs that accept MIDI) or, with "on", for any
+    // plugin. The note-on goes into the first block after the pre-roll, the note is held for noteSettleSeconds
+    // (silent input, not measured) so the attack can be excluded, and it is released after the run.
+    const bool sendNote = config.midiMode.equalsIgnoreCase("on") ||
+                          (config.midiMode.equalsIgnoreCase("auto") && numPluginIns == 0 && plugin.acceptsMidi());
+    bool noteOnPending = sendNote;
+    auto addPendingNoteOn = [&] {
+        if (noteOnPending) {
+            midiBuffer.addEvent(
+                juce::MidiMessage::noteOn(config.midiChannel, config.midiNote, (juce::uint8)config.midiVelocity), 0);
+            noteOnPending = false;
+        }
+    };
+    const int64_t settleSamples = sendNote ? (int64_t)(config.noteSettleSeconds * sampleRate) : 0;
+    for (int64_t done = 0; done < settleSamples; done += blockSize) {
+        outputBuffer.clear();
+        midiBuffer.clear();
+        addPendingNoteOn();
+        plugin.processBlock(outputBuffer, midiBuffer);
+    }
+
     // The output lags the input by the plugin's latency (queried after the parameters have taken effect).
     // Render that many extra samples, drop the first `latency` output samples, and pair each output sample
     // with the input from `latency` samples earlier.
@@ -203,9 +224,7 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
 
         // Process through plugin (modifies outputBuffer in-place); don't feed back any MIDI it produced
         midiBuffer.clear();
-        if (numPluginIns == 0 && currentSample == 0) {
-            midiBuffer.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)100), 0);
-        }
+        addPendingNoteOn(); // only if there was no settle period
         plugin.processBlock(outputBuffer, midiBuffer);
 
         // Delay the input by `latency` samples so it lines up with the output
@@ -262,6 +281,14 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
         }
 
         currentSample += numThisBlock;
+    }
+
+    // Release the note, so it can't carry into the next run (not every plugin clears held notes on reset())
+    if (sendNote) {
+        outputBuffer.clear();
+        midiBuffer.clear();
+        midiBuffer.addEvent(juce::MidiMessage::noteOff(config.midiChannel, config.midiNote), 0);
+        plugin.processBlock(outputBuffer, midiBuffer);
     }
 }
 

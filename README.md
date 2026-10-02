@@ -105,6 +105,20 @@ plugin_measure_grid_cli --config config.json --out /path/to/output
 
 See `example_config.json` for a complete example configuration file.
 
+### Instruments (MIDI note)
+
+Instruments have no audio input, so they're driven by a MIDI note instead of the test signal:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `midiMode` | `"auto"` | `"auto"`: send the note to plugins with no audio inputs that accept MIDI. `"on"`: send it to any plugin (e.g. synths with an audio input, MIDI-driven effects). `"off"`: never. |
+| `midiNote` | `60` | Note number, 0–127 |
+| `midiVelocity` | `100` | 1–127 |
+| `midiChannel` | `1` | 1–16 |
+| `noteSettleSeconds` | `0` | How long the note is held (with silent input, not measured) before measurement starts, to exclude the attack |
+
+The note-on is sent after the pre-roll, and a note-off is sent at the end of every run.
+
 ## 🔬 Analyzers
 
 The tool supports the following analyzers:

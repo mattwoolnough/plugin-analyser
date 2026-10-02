@@ -37,6 +37,16 @@ Config Config::fromJsonString(const juce::String& jsonString) {
             throw std::runtime_error("Invalid preRollSeconds " + std::to_string(config.preRollSeconds) +
                                      " (expected 0-60)");
     }
+    if (root->hasProperty("midiMode"))
+        config.midiMode = root->getProperty("midiMode").toString();
+    if (root->hasProperty("midiNote"))
+        config.midiNote = (int)root->getProperty("midiNote");
+    if (root->hasProperty("midiVelocity"))
+        config.midiVelocity = (int)root->getProperty("midiVelocity");
+    if (root->hasProperty("midiChannel"))
+        config.midiChannel = (int)root->getProperty("midiChannel");
+    if (root->hasProperty("noteSettleSeconds"))
+        config.noteSettleSeconds = (double)root->getProperty("noteSettleSeconds");
     if (root->hasProperty("blockSize"))
         config.blockSize = (int)root->getProperty("blockSize");
 
@@ -112,6 +122,16 @@ void Config::validate() const {
         throw std::runtime_error("Invalid sampleRate " + std::to_string(sampleRate) + " (expected 8000-768000)");
     if (!std::isfinite(seconds) || seconds <= 0.0 || seconds > 86400.0)
         throw std::runtime_error("Invalid seconds " + std::to_string(seconds) + " (expected > 0 and <= 86400)");
+    if (!midiMode.equalsIgnoreCase("auto") && !midiMode.equalsIgnoreCase("on") && !midiMode.equalsIgnoreCase("off"))
+        throw std::runtime_error("Invalid midiMode '" + midiMode.toStdString() + "' (expected auto, on or off)");
+    if (midiNote < 0 || midiNote > 127)
+        throw std::runtime_error("Invalid midiNote " + std::to_string(midiNote) + " (expected 0-127)");
+    if (midiVelocity < 1 || midiVelocity > 127)
+        throw std::runtime_error("Invalid midiVelocity " + std::to_string(midiVelocity) + " (expected 1-127)");
+    if (midiChannel < 1 || midiChannel > 16)
+        throw std::runtime_error("Invalid midiChannel " + std::to_string(midiChannel) + " (expected 1-16)");
+    if (!std::isfinite(noteSettleSeconds) || noteSettleSeconds < 0.0 || noteSettleSeconds > 60.0)
+        throw std::runtime_error("Invalid noteSettleSeconds " + std::to_string(noteSettleSeconds) + " (expected 0-60)");
     if (blockSize < 1 || blockSize > 65536)
         throw std::runtime_error("Invalid blockSize " + std::to_string(blockSize) + " (expected 1-65536)");
 }
