@@ -15,6 +15,10 @@ struct RunStats {
     float peakOutL = 0.0f;
     float peakOutR = 0.0f;
     int64_t sampleCount = 0;
+    // FNV-1a over each output sample's raw float BITS, in order, before any formatting. Equal hashes mean the
+    // run's output is sample-identical (to hash collision), which no RMS/peak statistic can establish.
+    uint64_t hashOutL = 14695981039346656037ULL;
+    uint64_t hashOutR = 14695981039346656037ULL;
 };
 
 struct RmsPeakAnalyzer : public Analyzer {

@@ -1,5 +1,7 @@
 #include "RawCsvAnalyzer.h"
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 RawCsvAnalyzer::RawCsvAnalyzer(const juce::File& outDir, const juce::String& signalType) : signalType(signalType) {
@@ -9,6 +11,8 @@ RawCsvAnalyzer::RawCsvAnalyzer(const juce::File& outDir, const juce::String& sig
     this->csvFile = std::make_unique<std::ofstream>(csvFile.getFullPathName().toStdString());
     if (!this->csvFile->is_open())
         throw std::runtime_error("Failed to open " + csvFile.getFullPathName().toStdString() + " for writing");
+    // LOSSLESS: samples are floats; max_digits10 of double also round-trips them exactly (and the time column).
+    *this->csvFile << std::setprecision(std::numeric_limits<double>::max_digits10);
 }
 
 RawCsvAnalyzer::~RawCsvAnalyzer() {

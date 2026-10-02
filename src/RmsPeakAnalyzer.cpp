@@ -1,6 +1,10 @@
 #include "RmsPeakAnalyzer.h"
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <fstream>
+#include <iomanip>
+#include <limits>
 #include <iostream>
 #include <stdexcept>
 
@@ -9,6 +13,19 @@ RmsPeakAnalyzer::RmsPeakAnalyzer(const juce::File& outDir, const std::vector<juc
     : paramNames(paramNames), outputDir(outDir), signalType(signalType) {}
 
 RmsPeakAnalyzer::~RmsPeakAnalyzer() {}
+
+namespace {
+// FNV-1a, 64-bit, over a float's four bytes in a fixed (little-endian) order, so the hash does not depend on the
+// host's byte order.
+inline void fnv1aFloat(uint64_t& hash, float value) {
+    uint32_t bits = 0;
+    std::memcpy(&bits, &value, sizeof(bits));
+    for (int byte = 0; byte < 4; ++byte) {
+        hash ^= static_cast<uint64_t>((bits >> (8 * byte)) & 0xFFu);
+        hash *= 1099511628211ULL;
+    }
+}
+}  // namespace
 
 void RmsPeakAnalyzer::processBlock(const BlockContext& ctx) {
     auto& stats = perRunStats[ctx.runId];
@@ -36,12 +53,14 @@ void RmsPeakAnalyzer::processBlock(const BlockContext& ctx) {
         float outL = ctx.outL[i];
         stats.sumSqOutL += (double)(outL * outL);
         stats.peakOutL = std::max(stats.peakOutL, std::abs(outL));
+        fnv1aFloat(stats.hashOutL, outL);
 
         // Output R
         if (ctx.outR != nullptr) {
             float outR = ctx.outR[i];
             stats.sumSqOutR += (double)(outR * outR);
             stats.peakOutR = std::max(stats.peakOutR, std::abs(outR));
+            fnv1aFloat(stats.hashOutR, outR);
         }
 
         stats.sampleCount++;
@@ -55,6 +74,9 @@ void RmsPeakAnalyzer::finish(const juce::File& outDir) {
 
     if (!out.is_open())
         throw std::runtime_error("Failed to open " + csvFile.getFullPathName().toStdString() + " for writing");
+    // LOSSLESS: every double written at round-trip precision (a float widened to double is exact, so peaks and
+    // parameter values round-trip too). The default 6 significant digits let distinct values print identically.
+    out << std::setprecision(std::numeric_limits<double>::max_digits10);
 
     // Header
     out << "runId";
@@ -64,6 +86,7 @@ void RmsPeakAnalyzer::finish(const juce::File& outDir) {
     out << ",inputGainDb";
     out << ",rmsInL,rmsInR,rmsOutL,rmsOutR";
     out << ",peakInL,peakInR,peakOutL,peakOutR";
+    out << ",outHashL,outHashR";
     out << "\n";
 
     // Data rows
@@ -96,6 +119,8 @@ void RmsPeakAnalyzer::finish(const juce::File& outDir) {
 
         out << "," << rmsInL << "," << rmsInR << "," << rmsOutL << "," << rmsOutR;
         out << "," << stats.peakInL << "," << stats.peakInR << "," << stats.peakOutL << "," << stats.peakOutR;
+        out << "," << std::hex << std::setfill('0') << std::setw(16) << stats.hashOutL << "," << std::setw(16)
+            << stats.hashOutR << std::dec << std::setfill(' ');
         out << "\n";
     }
 
